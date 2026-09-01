@@ -1420,6 +1420,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                         turnId: notificationTurnId,
                         ...(event.itemId ? { itemId: event.itemId } : {}),
                         text: event.text,
+                        ...(event.streamKind ? { streamKind: event.streamKind } : {}),
                         rawPayload: event.rawPayload,
                       }),
                     );
