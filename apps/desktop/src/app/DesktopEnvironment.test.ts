@@ -155,6 +155,28 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("keeps packaged Windows portable state beside the executable", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        {
+          platform: "win32",
+          isPackaged: true,
+          appPath: "C:/portable/resources/app.asar",
+          resourcesPath: "C:/portable/resources",
+        },
+        {
+          APPDATA: "C:/Users/alice/AppData/Roaming",
+          PORTABLE_EXECUTABLE_DIR: "C:/portable",
+          T3CODE_HOME: "C:/Users/alice/.t3",
+        },
+      );
+
+      assert.equal(environment.appDataDirectory, "C:/portable/data/appdata");
+      assert.equal(environment.baseDir, "C:/portable/data/t3");
+      assert.equal(environment.stateDir, "C:/portable/data/t3/userdata");
+    }),
+  );
+
   it.effect("keeps implicit development state separate from production state", () =>
     Effect.gen(function* () {
       const development = yield* makeEnvironment(

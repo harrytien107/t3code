@@ -158,18 +158,29 @@ const make = Effect.fn("desktop.environment.make")(function* (
   const homeDirectory = input.homeDirectory;
   const devServerUrl = config.devServerUrl;
   const isDevelopment = Option.isSome(devServerUrl);
-  const appDataDirectory =
-    input.platform === "win32"
-      ? Option.getOrElse(config.appDataDirectory, () =>
-          path.join(homeDirectory, "AppData", "Roaming"),
-        )
-      : input.platform === "darwin"
-        ? path.join(homeDirectory, "Library", "Application Support")
-        : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config"));
+  const portableExecutableDirectory =
+    input.isPackaged && input.platform === "win32"
+      ? config.portableExecutableDirectory
+      : Option.none<string>();
+  const appDataDirectory = Option.match(portableExecutableDirectory, {
+    onSome: (directory) => path.join(directory, "data", "appdata"),
+    onNone: () =>
+      input.platform === "win32"
+        ? Option.getOrElse(config.appDataDirectory, () =>
+            path.join(homeDirectory, "AppData", "Roaming"),
+          )
+        : input.platform === "darwin"
+          ? path.join(homeDirectory, "Library", "Application Support")
+          : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config")),
+  });
+  const t3Home = Option.match(portableExecutableDirectory, {
+    onSome: (directory) => Option.some(path.join(directory, "data", "t3")),
+    onNone: () => config.t3Home,
+  });
   const baseDir = resolveDesktopBaseDir({
     homeDirectory,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home,
   });
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
@@ -186,7 +197,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     baseDir,
     isDevelopment,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home,
   });
   const userDataDirName = isDevelopment ? "t3code-dev" : "t3code";
   const legacyUserDataDirName = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
