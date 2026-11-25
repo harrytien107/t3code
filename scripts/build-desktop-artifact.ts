@@ -2788,7 +2788,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   arch?: typeof BuildArch.Type,
 ) {
   const buildConfig: Record<string, unknown> = {
-    afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
+    ...(platform === "win" && target === "portable"
+      ? {}
+      : {
+          afterPack: (yield* Path.Path).join(
+            yield* RepoRoot,
+            "scripts/prepare-server-compile-cache.cjs",
+          ),
+        }),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
     artifactName: "T3-Code-${version}-${arch}.${ext}",
@@ -3232,6 +3239,7 @@ export const verifyWindowsPrimaryFffNativeLoad = Effect.fn(
   readonly appExecutableName: string;
   readonly targetArch: typeof BuildArch.Type;
   readonly verbose: boolean;
+  readonly skipExecution?: boolean;
 }) {
   const hostPlatform = yield* HostProcess.Platform;
   const hostArchitecture = yield* HostProcess.Architecture;
@@ -3246,7 +3254,8 @@ export const verifyWindowsPrimaryFffNativeLoad = Effect.fn(
       output: "The unpacked application does not contain its expected primary executable.",
     });
   }
-  if (hostPlatform !== "win32" || hostArchitecture !== input.targetArch) return;
+  if (input.skipExecution || hostPlatform !== "win32" || hostArchitecture !== input.targetArch)
+    return;
 
   const probeRoot = yield* fs.makeTempDirectoryScoped({
     prefix: "t3code-windows-primary-native-probe-",
@@ -3317,10 +3326,12 @@ export const verifyWindowsPackagedRuntime = Effect.fn(
   readonly appExecutableName: string;
   readonly targetArch: typeof BuildArch.Type;
   readonly verbose: boolean;
+  readonly skipExecution?: boolean;
 }) {
   const path = yield* Path.Path;
   const asarPath = path.join(input.packagedAppDir, "resources", WINDOWS_SERVER_ASAR_RESOURCE);
   yield* verifyWindowsPrimaryFffNativeLoad({ ...input, asarPath });
+  if (input.skipExecution) return;
   const hostPlatform = yield* HostProcess.Platform;
   if (hostPlatform !== "win32") {
     yield* Effect.log(
@@ -3341,6 +3352,7 @@ export const validateWindowsPackagedPayload = Effect.fn(
   readonly expectWslRuntime?: boolean;
   readonly fileLimit?: number;
   readonly verbose?: boolean;
+  readonly skipExecution?: boolean;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -3546,6 +3558,7 @@ export const validateWindowsPackagedPayload = Effect.fn(
     appExecutableName: input.appExecutableName,
     targetArch: input.targetArch,
     verbose: input.verbose ?? false,
+    ...(input.skipExecution ? { skipExecution: true } : {}),
   });
 
   yield* Effect.log(
@@ -4112,6 +4125,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
         runtimeArchivePath: options.wslRuntime,
       }),
       verbose: options.verbose,
+      skipExecution: options.target === "portable",
     });
   }
   // The probe runs on the host Node, so a cross-arch build skips it.

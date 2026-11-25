@@ -554,6 +554,22 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it.effect("omits executable compile-cache hooks for Windows portable builds", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "win",
+        "portable",
+        "0.1.11",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+      assert.notProperty(config, "afterPack");
+      assert.nestedPropertyVal(config, "win.target[0]", "portable");
+    }),
+  );
+
   it.effect("names the Electron window class in the Linux desktop entry", () =>
     Effect.gen(function* () {
       const linux = yield* createBuildConfig(
@@ -1216,6 +1232,45 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           spawnerLayer,
           Layer.succeed(HostProcess.Platform, "darwin"),
           Layer.succeed(HostProcess.Architecture, "arm64"),
+        ),
+      ),
+    );
+  });
+
+  it.effect("validates Windows portable payloads without executing binaries", () => {
+    const commands: unknown[] = [];
+    const spawnerLayer = Layer.succeed(
+      ChildProcessSpawner.ChildProcessSpawner,
+      ChildProcessSpawner.make((command) => {
+        commands.push(command);
+        return Effect.succeed(mockProcess(0));
+      }),
+    );
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const fixture = yield* makeWindowsPayloadFixture({ copyUnpackedNatives: true });
+        const input = {
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "x64" as const,
+          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+          skipExecution: true,
+        };
+        yield* validateWindowsPackagedPayload(input);
+        assert.lengthOf(commands, 0);
+        yield* fs.remove(path.join(fixture.packagedAppDir, fixture.appExecutableName));
+        const error = yield* validateWindowsPackagedPayload(input).pipe(Effect.flip);
+        assert.instanceOf(error, WindowsPrimaryNativeProbeError);
+        assert.lengthOf(commands, 0);
+      }),
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          spawnerLayer,
+          Layer.succeed(HostProcess.Platform, "win32"),
+          Layer.succeed(HostProcess.Architecture, "x64"),
         ),
       ),
     );
