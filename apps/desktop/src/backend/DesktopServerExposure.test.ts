@@ -272,7 +272,12 @@ describe("DesktopServerExposure", () => {
       {
         bridge0: [{ address: "192.168.2.1", family: "IPv4", internal: false }],
         utun4: [{ address: "10.8.0.2", family: "IPv4", internal: false }],
-        en0: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
+        "vEthernet (WSL)": [{ address: "172.24.144.1", family: "IPv4", internal: false }],
+        "vEthernet (WSL (Hyper-V firewall))": [
+          { address: "172.25.144.1", family: "IPv4", internal: false },
+        ],
+        "vEthernet (Default Switch)": [{ address: "172.20.96.1", family: "IPv4", internal: false }],
+        Ethernet: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
       },
       Effect.gen(function* () {
         const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
@@ -280,6 +285,22 @@ describe("DesktopServerExposure", () => {
 
         const change = yield* serverExposure.setMode("network-accessible");
         assert.equal(change.state.advertisedHost, "192.168.1.20");
+      }),
+    ),
+  );
+
+  it.effect("keeps an external Hyper-V switch eligible for LAN pairing", () =>
+    withHarness(
+      {
+        "vEthernet (External)": [{ address: "192.168.1.30", family: "IPv4", internal: false }],
+        Ethernet: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
+      },
+      Effect.gen(function* () {
+        const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
+        yield* serverExposure.configureFromSettings({ port: 4173 });
+
+        const change = yield* serverExposure.setMode("network-accessible");
+        assert.equal(change.state.advertisedHost, "192.168.1.30");
       }),
     ),
   );
