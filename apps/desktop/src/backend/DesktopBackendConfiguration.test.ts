@@ -63,6 +63,7 @@ function layerEnvironment(
     readonly devServerUrl?: string;
     readonly platform?: NodeJS.Platform;
     readonly resourcesPath?: string;
+    readonly portableExecutableDirectory?: string;
     readonly appVersion?: string;
     readonly processArch?: NodeJS.Architecture;
     readonly otlpTracesUrl?: string;
@@ -87,6 +88,7 @@ function layerEnvironment(
         NodeCrypto.layer,
         DesktopConfig.layerTest({
           T3CODE_HOME: baseDir,
+          PORTABLE_EXECUTABLE_DIR: options?.portableExecutableDirectory,
           T3CODE_PORT: "9999",
           T3CODE_MODE: "desktop",
           T3CODE_DESKTOP_LAN_HOST: "192.168.1.50",
@@ -306,6 +308,7 @@ describe("DesktopBackendConfiguration", () => {
                 appPath: `${resourcesPath}/app.asar`,
                 platform: "win32",
                 resourcesPath,
+                portableExecutableDirectory: path.join(baseDir, "portable"),
               }),
             ),
           ),
@@ -317,6 +320,10 @@ describe("DesktopBackendConfiguration", () => {
         path.join(resourcesPath, "server.asar/apps/server/dist/bin.mjs"),
       );
       assert.equal(config.env.ELECTRON_RUN_AS_NODE, "1");
+      const portableHome = path.join(baseDir, "portable", "data", "t3");
+      assert.equal(config.bootstrap.t3Home, portableHome);
+      const childEnv = { T3CODE_HOME: baseDir, ...config.env };
+      assert.equal(childEnv.T3CODE_HOME, portableHome);
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
